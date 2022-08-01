@@ -136,4 +136,38 @@ public class ProgressBar
             Thread.Sleep(5);
         }
     }
+
+    public static int BuilderSelector(string[] options)
+    {
+        Console.WriteLine($"Any options({options.Length}), default = 1: ");
+        for (int i = 0; i < options.Length; i++)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write($"  {i+1}. ");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write($"{options[i]}\n");
+        }
+        while (true)
+        {
+            Console.Write("Choose: ");
+            var input = Console.ReadLine();
+            if (string.IsNullOrEmpty(input) || string.IsNullOrWhiteSpace(input))
+            {
+                return 0;
+            }
+
+            if (int.TryParse(input, out var value))
+            {
+                if (value > options.Length)
+                {
+                    Console.WriteLine("error: incorrect value.");
+                    continue;
+                }
+
+                return value - 1;
+            }
+
+            Console.WriteLine("error: incorrect value.");
+        }
+    }
 }

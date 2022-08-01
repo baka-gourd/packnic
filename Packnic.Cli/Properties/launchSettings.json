@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Packnic.Cli": {
+      "commandName": "Project",
+      "commandLineArgs": "i\r\nv/TEST"
+    }
+  }
+}
