@@ -1,5 +1,8 @@
-﻿using CurseForge.APIClient.Models.Files;
+﻿using CurseForge.APIClient.Models.Enums;
+using CurseForge.APIClient.Models.Files;
 using CurseForge.APIClient.Models.Mods;
+
+using Packnic.Core.Model;
 
 namespace Packnic.Core;
 
@@ -104,7 +107,7 @@ public static class PackageParser
 
             if (!info.Data.IsAvailable)
             {
-                
+
             }
             var modFile = await Utils.CfClient.GetModFileAsync(info.Data.Id, index.FileId);
             if (modFile is not null)
@@ -117,7 +120,9 @@ public static class PackageParser
                     Name = info.Data.Name,
                     Platform = Platform.CurseForge,
                     UniqueId = info.Data.Id.ToString(),
-                    Version = Config.GameVersion
+                    Version = Config.GameVersion,
+                    Hash = modFile.Data.Hashes.First().Value,
+                    HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1
                 };
                 result.Add(main);
                 if (modFile.Data.Dependencies is { Count: > 0 })
@@ -168,7 +173,9 @@ public static class PackageParser
                         Name = mod.Name,
                         Platform = Platform.CurseForge,
                         UniqueId = mod.Id.ToString(),
-                        Version = Config.GameVersion
+                        Version = Config.GameVersion,
+                        Hash = modFile.Data.Hashes.First().Value,
+                        HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1
                     };
                     result.Add(main);
                     if (modFile.Data.Dependencies is { Count: > 0 })

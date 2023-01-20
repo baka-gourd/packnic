@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using Packnic.Core.Model;
 
 namespace Packnic.Core;
 
@@ -13,4 +14,6 @@ public class ModPackage
     public bool IsFixed { get; set; }
     public string? DownloadUrl { get; set; }
     public string? Description { get; set; }
+    public string? Hash { get; set; }
+    public HashType HashType { get; set; }
 }

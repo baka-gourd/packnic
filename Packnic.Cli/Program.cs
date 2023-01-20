@@ -1,19 +1,25 @@
 ﻿using System.Collections.Concurrent;
-using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
-
+using System.Runtime.InteropServices;
+using System.Security.Principal;
 using Packnic.Core;
 
 namespace Packnic.Cli;
 
 class Program
 {
+    public static bool IsRoot => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                          new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
     public static async Task Main(string[] args)
     {
         CommandLineBuilder cb = new(CommandProvider.GetRootCommand());
         cb.AddMiddleware(async (context, next) =>
         {
+            if (IsRoot)
+            {
+                Console.WriteLine("info: Cli will create \"SymbolicLink\" instead of copy file.");
+            }
             if (!CheckEnvironment())
             {
                 Console.WriteLine("error: not a packnic project");
@@ -34,8 +40,10 @@ class Program
 
     public static async Task InstallHandler(string[] items, string? token)
     {
+        Utils.InitCfApi("$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm");
         var cache = new CacheFileProvider(Config.CachePath);
-        cache.GetModCacheByVersion("1.12.2");
+        var cacheManager = cache.GetModCacheByVersion(Config.GameVersion);
+        cacheManager.RefreshIndex();
 
         var list = new List<ModPackage>();
         if (token is not null)
@@ -77,15 +85,53 @@ class Program
             {
                 await sem.WaitAsync();
                 var path = Path.Combine(Directory.GetCurrentDirectory(), Path.GetFileName(pkg.DownloadUrl)!);
-                if (File.Exists(path))
+
+                var fileInfo = new FileInfo(path);
+
+                if (File.Exists(
+                        (fileInfo.Attributes & FileAttributes.ReparsePoint) is FileAttributes.ReparsePoint ?
+                            fileInfo.LinkTarget
+                            : path))
                 {
                     downloadState.TryUpdate(pkg.Name, false, true);
                     sem.Release();
                     return;
                 }
 
-                var bytes = await Utils.NormalClient.GetByteArrayAsync(pkg.DownloadUrl);
-                await File.WriteAllBytesAsync(path, bytes);
+                var state = cacheManager.TryAddFileToCache(pkg.DownloadUrl!, Path.GetFileName(pkg.DownloadUrl)!,
+                    out var file);
+
+                if (state)
+                {
+                    if (IsRoot)
+                    {
+                        if (File.Exists(path) && new FileInfo(path).LinkTarget == file!.Path)
+                        {
+                            return;
+                        }
+                        File.CreateSymbolicLink(path, file!.Path);
+                    }
+                    else
+                    {
+                        File.Copy(file!.Path, path, true);
+                    }
+                }
+                else
+                {
+                    var hash = Convert.FromHexString(pkg.Hash!);
+                    if (IsRoot)
+                    {
+                        if (File.Exists(path) && new FileInfo(path).LinkTarget == file!.Path)
+                        {
+                            return;
+                        }
+                        File.CreateSymbolicLink(path, cacheManager.GetFile(hash, pkg.HashType).Path);
+                    }
+                    else
+                    {
+                        File.Copy(cacheManager.GetFile(hash, pkg.HashType).Path, path, true);
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -98,7 +144,11 @@ class Program
             }
         });
 
-        new Thread(() => Task.WhenAll(tasks)).Start();
+        new Thread(() =>
+        {
+            Task.WaitAll(tasks.ToArray());
+            cacheManager.Dispose();
+        }).Start();
         ProgressBar.DownloadMany(names, ref downloadState);
         Console.WriteLine("info: all mods installed.");
     }
