@@ -12,15 +12,19 @@ public class CommandProvider
     public static Command UpgradeCommand { get; set; } = new("upgrade", "Upgrade mod(s).");
     public static Command SearchCommand { get; set; } = new("search", "Search a mod.");
     public static Command InitCommand { get; set; } = new("init", "Init a project.");
+    public static Option<string> CfToken { get; set; } = new("--cfToken", "CFToken.");
 
     static CommandProvider()
     {
+        CfToken.AddAlias("-cf");
+
         #region InstallCommand
 
         InstallCommand.AddAlias("i");
         InstallCommand.AddAlias("add");
         var installArgument = new Argument<string[]>("items", Array.Empty<string>, "Will be installed mods.");
         InstallCommand.Add(installArgument);
+        InstallCommand.SetHandler(Program.InstallHandler,installArgument,CfToken);
 
         #endregion
 
@@ -34,8 +38,6 @@ public class CommandProvider
 
     public static RootCommand GetRootCommand()
     {
-        Option<string?> cfToken = new("--cfToken", "CFToken.");
-        cfToken.AddAlias("-cf");
         RootCommand rootCommand = new("Packnic! RUA!")
         {
             InstallCommand,
@@ -47,7 +49,7 @@ public class CommandProvider
             SearchCommand,
             InitCommand
         };
-        rootCommand.AddGlobalOption(cfToken);
+        rootCommand.AddGlobalOption(CfToken);
         
         return rootCommand;
     }

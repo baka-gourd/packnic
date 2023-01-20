@@ -29,10 +29,10 @@ public class CacheFileProvider
             Directory.CreateDirectory(path);
         }
 
-        return new CacheManager(version);
+        return new CacheManager(path);
     }
 
-    public List<LocalMod> GetAllMods()
+    public List<LocalFile> GetAllMods()
     {
         throw new NotImplementedException();
     }

@@ -32,8 +32,11 @@ class Program
         return true;
     }
 
-    private static async Task InstallHandler(string[] items, string? token)
+    public static async Task InstallHandler(string[] items, string? token)
     {
+        var cache = new CacheFileProvider(Config.CachePath);
+        cache.GetModCacheByVersion("1.12.2");
+
         var list = new List<ModPackage>();
         if (token is not null)
         {
