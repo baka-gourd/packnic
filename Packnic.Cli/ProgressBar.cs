@@ -35,6 +35,7 @@ public class ProgressBar
 
             Thread.Sleep(5);
         }
+        Console.Write("\n");
     }
 
     public static void DownloadOne(string name, ref bool processing)
@@ -73,6 +74,7 @@ public class ProgressBar
 
             Thread.Sleep(5);
         }
+        Console.Write("\n");
     }
 
     public static void DownloadMany(IEnumerable<string> names, ref ConcurrentDictionary<string, bool> processing)
@@ -135,6 +137,7 @@ public class ProgressBar
 
             Thread.Sleep(5);
         }
+        Console.Write("\n");
     }
 
     public static int BuilderSelector(string[] options)

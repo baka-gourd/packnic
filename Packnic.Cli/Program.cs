@@ -1,4 +1,5 @@
-﻿using System.CommandLine;
+﻿using System.Collections.Concurrent;
+using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 
@@ -10,35 +11,7 @@ class Program
 {
     public static async Task Main(string[] args)
     {
-        RootCommand rootCommand = new("Packnic! RUA!");
-        Option<string?> cfToken = new("--cfToken", "CFToken.");
-        cfToken.AddAlias("-cf");
-        rootCommand.AddGlobalOption(cfToken);
-        Command install = new("install", "Install a mod.");
-        install.AddAlias("i");
-        install.AddAlias("add");
-        Command uninstall = new("uninstall", "Uninstall a mod");
-        uninstall.AddAlias("r");
-        uninstall.AddAlias("rm");
-        Command import = new("import", "Import a modpack.");
-        Command export = new("export", "Export a modpack.");
-        Command update = new("update", "Update mod information.");
-        Command upgrade = new("upgrade", "Upgrade mod(s).");
-        Command search = new("search", "Search a mod.");
-        Command init = new("init", "Init a project.");
-        Argument<string[]> installArgument = new("items", Array.Empty<string>, "Will be installed mods.");
-        install.AddArgument(installArgument);
-        install.SetHandler(InstallHandler, installArgument, cfToken);
-        search.AddAlias("s");
-        rootCommand.Add(install);
-        rootCommand.Add(uninstall);
-        rootCommand.Add(import);
-        rootCommand.Add(export);
-        rootCommand.Add(update);
-        rootCommand.Add(upgrade);
-        rootCommand.Add(search);
-        rootCommand.Add(init);
-        CommandLineBuilder cb = new(rootCommand);
+        CommandLineBuilder cb = new(CommandProvider.GetRootCommand());
         cb.AddMiddleware(async (context, next) =>
         {
             if (!CheckEnvironment())
@@ -59,8 +32,9 @@ class Program
         return true;
     }
 
-    private static void InstallHandler(string[] items, string? token)
+    private static async Task InstallHandler(string[] items, string? token)
     {
+        var list = new List<ModPackage>();
         if (token is not null)
         {
             Console.WriteLine(token);
@@ -73,30 +47,56 @@ class Program
                 throw new ArgumentException("Invalid mod");
             }
             var platform = PackageParser.ParsePlatform(strings);
-            Console.WriteLine("info: load database...");
-            if (platform is Platform.VirtualPackage)
-            {
-                VirtualPackage? selected = null;
-                var packages = PackageParser.ParseVirtualPackages(strings[1]);
-                if (packages.Length == 0)
-                {
-                    Console.WriteLine("warn: cannot find any virtual package");
-                    return;
-                }
-                if (packages.Length > 1)
-                {
-                    selected = packages[ProgressBar.BuilderSelector(packages.Select(p => p.Name).ToArray()!)];
-                }
-                else
-                {
-                    selected = packages[0];
-                }
 
-                foreach (var mod in selected.Mods!)
-                {
-                    Console.WriteLine(mod.DownloadUrl);
-                }
+            if (platform is Platform.CurseForge)
+            {
+                bool processing = true;
+                new Thread(() => ProgressBar.ResloveDependencies(strings[1], ref processing)).Start();
+                list.AddRange(await PackageParser.ParseCurseForgeAsync(strings[1]));
+                processing = false;
             }
         }
+
+        list = list.DistinctBy(m => m.DownloadUrl).ToList();
+
+        SemaphoreSlim sem = new SemaphoreSlim(8);
+        List<string> names = new();
+        ConcurrentDictionary<string, bool> downloadState = new();
+        foreach (var modPackage in list)
+        {
+            names.Add(modPackage.Name);
+            downloadState.TryAdd(modPackage.Name, true);
+        }
+
+        var tasks = list.Select(async pkg =>
+        {
+            try
+            {
+                await sem.WaitAsync();
+                var path = Path.Combine(Directory.GetCurrentDirectory(), Path.GetFileName(pkg.DownloadUrl)!);
+                if (File.Exists(path))
+                {
+                    downloadState.TryUpdate(pkg.Name, false, true);
+                    sem.Release();
+                    return;
+                }
+
+                var bytes = await Utils.NormalClient.GetByteArrayAsync(pkg.DownloadUrl);
+                await File.WriteAllBytesAsync(path, bytes);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("error: " + e);
+            }
+            finally
+            {
+                downloadState.TryUpdate(pkg.Name, false, true);
+                sem.Release();
+            }
+        });
+
+        new Thread(() => Task.WhenAll(tasks)).Start();
+        ProgressBar.DownloadMany(names, ref downloadState);
+        Console.WriteLine("info: all mods installed.");
     }
 }
