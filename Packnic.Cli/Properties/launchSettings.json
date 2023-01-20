@@ -2,7 +2,7 @@
   "profiles": {
     "Packnic.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "i\r\nv/TEST"
+      "commandLineArgs": "i\r\nc/~364295"
     }
   }
 }
