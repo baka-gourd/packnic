@@ -2,9 +2,9 @@
 
 public record LocalFile
 {
-    public Guid Id { get; set; }
-    public byte[] Sha1 { get; set; } = null!;
-    public byte[] Md5 { get; set; } = null!;
-    public string Path { get; set; } = null!;
-    public string Name { get; set; } = null!;
+    public Guid Id { get; init; }
+    public byte[] Sha1 { get; init; } = null!;
+    public byte[] Md5 { get; init; } = null!;
+    public string Path { get; init; } = null!;
+    public string Name { get; init; } = null!;
 }
