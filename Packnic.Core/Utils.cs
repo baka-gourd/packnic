@@ -1,7 +1,7 @@
-﻿using CurseForge.APIClient;
+﻿using System.Runtime.InteropServices;
+using System.Security.Principal;
+using CurseForge.APIClient;
 using Packnic.Core.Model;
-
-using System.Xml.Linq;
 
 namespace Packnic.Core;
 
@@ -9,6 +9,8 @@ public static class Utils
 {
     public static HttpClient NormalClient { get; set; } = new();
     private static ApiClient? _cfClient;
+    public static bool IsRoot => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                                 new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
 
     static ApiClient GetCfApiClient()
     {
@@ -65,6 +67,11 @@ public static class Utils
         return type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash);
     }
 
+    public static string GetFileName(this ModPackage pkg)
+    {
+        return Path.GetFileName(pkg.DownloadUrl!);
+    }
+
     public static LocalFileNode? FindById(this List<LocalFileNode> list, Guid id)
     {
         return list.Find(node => node.Id.Equals(id));
@@ -72,7 +79,14 @@ public static class Utils
 
     public static LocalFileNode? FindByName(this List<LocalFileNode> list, string name)
     {
-        return list.Find(node => node.Name == name);
+        LocalFileNode? result;
+        result = list.Find(node => node.Name == name);
+        list.ForEach(f =>
+        {
+            result ??= f.FindChildByName(name);
+        });
+
+        return result;
     }
 
     public static void AddFile(this List<LocalFileNode> list, LocalFile file)

@@ -32,12 +32,20 @@ public record LocalFileNode : LocalFile
 
     public void AddChild(LocalFileNode node)
     {
+        if (Children.FindById(node.Id) is not null)
+        {
+            return;
+        }
         node.AddParent(this);
         Children.Add(node);
     }
 
     public void AddChild(LocalFile file)
     {
+        if (Children.FindById(file.Id) is not null)
+        {
+            return;
+        }
         var node = new LocalFileNode(file);
         node.AddParent(this);
         Children.Add(node);

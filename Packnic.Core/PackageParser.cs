@@ -59,7 +59,7 @@ public static class PackageParser
         return Platform.Unknown;
     }
 
-    public static async Task<List<ModPackage>> ParseModPackageAsync(string mod, bool pass = false)
+    public static async Task<ModPackage> ParseModPackageAsync(string mod, bool pass = false)
     {
         var strings = mod.Split("/", 2);
         if (strings.Length < 2)
@@ -81,10 +81,10 @@ public static class PackageParser
         return result;
     }
 
-    public static async Task<List<ModPackage>> ParseCurseForgeAsync(string name)
+    public static async Task<ModPackage> ParseCurseForgeAsync(string name)
     {
+        ModPackage? result = null;
         string? id;
-        List<ModPackage> result = new();
         if (name.StartsWith("~"))
         {
             id = name[1..];
@@ -107,24 +107,20 @@ public static class PackageParser
 
             if (!info.Data.IsAvailable)
             {
-
+                //TODO: fuck cf
             }
             var modFile = await Utils.CfClient.GetModFileAsync(info.Data.Id, index.FileId);
             if (modFile is not null)
             {
                 ModPackage main = new()
                 {
-                    Description = info.Data.Summary,
                     DownloadUrl = modFile.Data.DownloadUrl,
-                    IsFixed = false,
                     Name = info.Data.Name,
                     Platform = Platform.CurseForge,
-                    UniqueId = info.Data.Id.ToString(),
                     Version = Config.GameVersion,
                     Hash = modFile.Data.Hashes.First().Value,
                     HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1
                 };
-                result.Add(main);
                 if (modFile.Data.Dependencies is { Count: > 0 })
                 {
                     var mods = new List<int>();
@@ -138,12 +134,17 @@ public static class PackageParser
                     }
 
                     var dependencies = await ParseCurseForgeInBatchAsync(mods);
-                    result.AddRange(dependencies);
+                    main.Children.AddRange(dependencies.Select(pkg =>
+                    {
+                        pkg.Parents.Add(main);
+                        return pkg;
+                    }));
                 }
+                result = main;
             }
         }
 
-        return result.DistinctBy(m => m.DownloadUrl).ToList();
+        return result!;
     }
 
     public static async Task<List<ModPackage>> ParseCurseForgeInBatchAsync(List<int> ids)
@@ -167,17 +168,14 @@ public static class PackageParser
                 {
                     ModPackage main = new()
                     {
-                        Description = mod.Summary,
                         DownloadUrl = modFile.Data.DownloadUrl,
-                        IsFixed = false,
                         Name = mod.Name,
                         Platform = Platform.CurseForge,
-                        UniqueId = mod.Id.ToString(),
                         Version = Config.GameVersion,
                         Hash = modFile.Data.Hashes.First().Value,
                         HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1
                     };
-                    result.Add(main);
+
                     if (modFile.Data.Dependencies is { Count: > 0 })
                     {
                         var mods = new List<int>();
@@ -191,16 +189,22 @@ public static class PackageParser
                         }
 
                         var dependencies = await ParseCurseForgeInBatchAsync(mods);
-                        result.AddRange(dependencies);
+                        main.Children.AddRange(dependencies.Select(pkg =>
+                        {
+                            pkg.Parents.Add(main);
+                            return pkg;
+                        }));
                     }
+
+                    result.Add(main);
                 }
             }
         }
 
-        return result.DistinctBy(m => m.DownloadUrl).ToList();
+        return result;
     }
 
-    public static async Task<List<ModPackage>> ParseModrinthAsync(string name)
+    public static async Task<ModPackage> ParseModrinthAsync(string name)
     {
         throw new NotImplementedException();
     }
@@ -210,7 +214,7 @@ public static class PackageParser
         throw new NotImplementedException();
     }
 
-    public static async Task<List<ModPackage>> ParseCustomAsync(string name)
+    public static async Task<ModPackage> ParseCustomAsync(string name)
     {
         throw new NotImplementedException();
     }

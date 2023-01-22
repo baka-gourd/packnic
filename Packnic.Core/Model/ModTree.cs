@@ -12,6 +12,10 @@ public class ModTree : List<LocalFileNode>
 
     public void Add(LocalFile file)
     {
+        if (this.FindById(file.Id) is not null)
+        {
+            return;
+        }
         base.Add(new LocalFileNode(file));
     }
 

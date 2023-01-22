@@ -72,13 +72,24 @@ public class CacheManager : IDisposable
             throw new Exception();
         }
 
-        File.WriteAllText(_indexFile, JsonSerializer.Serialize(files, new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+        var fs = File.OpenWrite(_indexFile);
+        var str = JsonSerializer.Serialize(files,
+            new JsonSerializerOptions {WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping});
+        var sw = new StreamWriter(fs);
+        sw.Write(str);
+        sw.Close();
+        fs.Close();
         LocalFiles = files;
     }
 
     void ReadIndex()
     {
-        LocalFiles = new ConcurrentBag<LocalFile>(JsonSerializer.Deserialize<List<LocalFile>>(File.ReadAllText(_indexFile)) ?? new List<LocalFile>());
+        var fs = File.OpenRead(_indexFile);
+        var sr = new StreamReader(fs);
+        var str = sr.ReadToEnd();
+        sr.Close();
+        fs.Close();
+        LocalFiles = new ConcurrentBag<LocalFile>(JsonSerializer.Deserialize<List<LocalFile>>(str) ?? new List<LocalFile>());
     }
 
     public void RefreshIndex()
