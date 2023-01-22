@@ -109,11 +109,16 @@ class Program
                         {
                             return;
                         }
-                        File.CreateSymbolicLink(path, file!.Path);
+                        fileInfo.CreateAsSymbolicLink(file!.Path);
                     }
                     else
                     {
-                        File.Copy(file!.Path, path, true);
+                        var fs = File.OpenRead(file!.Path);
+                        var dst = fileInfo.Create();
+                        await fs.CopyToAsync(dst);
+                        dst.Close();
+                        fs.Close();
+                        //File.Copy(file!.Path, path, true);
                     }
                 }
                 else

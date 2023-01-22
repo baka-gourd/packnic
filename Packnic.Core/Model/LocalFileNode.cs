@@ -18,13 +18,15 @@ public record LocalFileNode : LocalFile
         Sha1 = file.Sha1;
         Path = file.Path;
         Name = file.Name;
-        Id = Guid.NewGuid();
+        Id = file.Id;
         Parents = new List<Guid>();
         Children = new List<LocalFileNode>();
     }
 
     // for JsonSerializer
+#pragma warning disable CS8618
     public LocalFileNode()
+#pragma warning restore CS8618
     {
     }
 

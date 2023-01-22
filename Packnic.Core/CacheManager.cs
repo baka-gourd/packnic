@@ -59,7 +59,7 @@ public class CacheManager : IDisposable
 
             files.Add(new LocalFile
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.Parse(Convert.ToHexString(md5)),
                 Md5 = md5,
                 Name = file.Name,
                 Path = file.FullName.Replace("\\", "/"),
@@ -120,7 +120,7 @@ public class CacheManager : IDisposable
 
         var file = new LocalFile
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.Parse(Convert.ToHexString(md5)),
             Md5 = md5,
             Sha1 = sha1,
             Name = name,

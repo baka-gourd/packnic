@@ -56,7 +56,7 @@ namespace Packnic.Tests
             var str = tree.ToString();
             var obj = JsonSerializer.Deserialize<ModTree>(str);
             var str2 = obj!.ToString();
-            Assert.AreEqual(str2,str);
+            Assert.That(str2,Is.EqualTo(str));
         }
     }
 }
