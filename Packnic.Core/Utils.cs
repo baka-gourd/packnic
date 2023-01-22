@@ -1,4 +1,5 @@
 ﻿using CurseForge.APIClient;
+using Packnic.Core.Model;
 
 namespace Packnic.Core;
 
@@ -48,12 +49,27 @@ public static class Utils
                 return false;
             }
 
-            if (!a.Equals(b))
+            if (!a!.Equals(b))
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    public static LocalFileNode? FindById(this List<LocalFileNode> list, Guid id)
+    {
+        return list.Find(node => node.Id.Equals(id));
+    }
+
+    public static LocalFileNode? FindByName(this List<LocalFileNode> list, string name)
+    {
+        return list.Find(node => node.Name == name);
+    }
+
+    public static void AddFile(this List<LocalFileNode> list, LocalFile file)
+    {
+        list.Add(new LocalFileNode(file));
     }
 }

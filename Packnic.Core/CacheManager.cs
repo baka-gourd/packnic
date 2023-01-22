@@ -9,9 +9,11 @@ namespace Packnic.Core;
 
 public class CacheManager : IDisposable
 {
+    private bool _disposed = false;
     private string _path;
     private string _indexFile => Path.Combine(_path, ".index");
     public ConcurrentBag<LocalFile>? LocalFiles { get; set; }
+    private ConcurrentBag<LocalFile> RemovedFiles { get; set; } = new();
 
     public CacheManager(string path)
     {
@@ -131,13 +133,42 @@ public class CacheManager : IDisposable
         return file;
     }
 
-    public LocalFile GetFile(byte[] hash, HashType type)
+    public LocalFile? GetFile(byte[] hash, HashType type)
     {
-        return LocalFiles!.FirstOrDefault(file => type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash))!;
+        if (RemovedFiles!.FirstOrDefault(file => type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash)) is not null)
+        {
+            return null;
+        }
+
+        return LocalFiles!.FirstOrDefault(file => type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash));
+    }
+
+    public bool DeleteFile(byte[] hash, HashType type)
+    {
+        var file = LocalFiles!.FirstOrDefault(file => type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash));
+
+        if (file is null)
+        {
+            return false;
+        }
+
+        File.Delete(file.Path);
+        RemovedFiles.Add(file);
+        return true;
     }
 
     public void Dispose()
     {
+        RefreshIndex();
+        _disposed = true;
+    }
+
+    ~CacheManager()
+    {
+        if (_disposed)
+        {
+            return;
+        }
         RefreshIndex();
     }
 }

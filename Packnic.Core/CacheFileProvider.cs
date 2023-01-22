@@ -32,7 +32,7 @@ public class CacheFileProvider
         return new CacheManager(path);
     }
 
-    public List<LocalFile> GetAllMods()
+    public List<LocalFile> GetAllFiles()
     {
         throw new NotImplementedException();
     }

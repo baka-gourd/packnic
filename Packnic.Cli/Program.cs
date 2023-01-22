@@ -125,11 +125,11 @@ class Program
                         {
                             return;
                         }
-                        File.CreateSymbolicLink(path, cacheManager.GetFile(hash, pkg.HashType).Path);
+                        File.CreateSymbolicLink(path, cacheManager.GetFile(hash, pkg.HashType)!.Path);
                     }
                     else
                     {
-                        File.Copy(cacheManager.GetFile(hash, pkg.HashType).Path, path, true);
+                        File.Copy(cacheManager.GetFile(hash, pkg.HashType)!.Path, path, true);
                     }
                 }
             }
