@@ -135,17 +135,17 @@ public class CacheManager : IDisposable
 
     public LocalFile? GetFile(byte[] hash, HashType type)
     {
-        if (RemovedFiles!.FirstOrDefault(file => type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash)) is not null)
+        if (RemovedFiles!.FirstOrDefault(node => node.ExactHash(hash, type)) is not null)
         {
             return null;
         }
 
-        return LocalFiles!.FirstOrDefault(file => type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash));
+        return LocalFiles!.FirstOrDefault(node => node.ExactHash(hash, type));
     }
 
     public bool DeleteFile(byte[] hash, HashType type)
     {
-        var file = LocalFiles!.FirstOrDefault(file => type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash));
+        var file = LocalFiles!.FirstOrDefault(node => node.ExactHash(hash, type));
 
         if (file is null)
         {

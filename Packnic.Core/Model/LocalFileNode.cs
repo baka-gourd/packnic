@@ -1,6 +1,6 @@
 ﻿namespace Packnic.Core.Model;
 
-public record LocalFileNode:LocalFile
+public record LocalFileNode : LocalFile
 {
     /// <summary>
     /// DO NOT ADD Parents BY Add().
@@ -33,7 +33,7 @@ public record LocalFileNode:LocalFile
         node.AddParent(this);
         Children.Add(node);
     }
-    
+
     public void AddChild(LocalFile file)
     {
         var node = new LocalFileNode(file);
@@ -45,7 +45,7 @@ public record LocalFileNode:LocalFile
     {
         Parents.Add(node.Id);
     }
-    
+
     public void AddParent(LocalFile file)
     {
         Parents.Add(new LocalFileNode(file).Id);
@@ -58,12 +58,60 @@ public record LocalFileNode:LocalFile
             AddChild(node);
         }
     }
-    
+
     public void AddChildren(IEnumerable<LocalFile> files)
     {
         foreach (var file in files)
         {
             AddChild(file);
         }
+    }
+
+    public LocalFileNode? FindChildByName(string name)
+    {
+        var child = Children.Find(node => node.Name == name);
+        if (child is not null)
+        {
+            return child;
+        }
+
+        foreach (var node in Children)
+        {
+            return node.FindChildByName(name);
+        }
+
+        return null;
+    }
+
+    public LocalFileNode? FindChildById(Guid id)
+    {
+        var child = Children.Find(node => node.Id.Equals(id));
+        if (child is not null)
+        {
+            return child;
+        }
+
+        foreach (var node in Children)
+        {
+            return node.FindChildById(id);
+        }
+
+        return null;
+    }
+
+    public LocalFileNode? FindChildByHash(byte[] hash, HashType type)
+    {
+        var child = Children.Find(node => node.ExactHash(hash, type));
+        if (child is not null)
+        {
+            return child;
+        }
+
+        foreach (var node in Children)
+        {
+            return node.FindChildByHash(hash, type);
+        }
+
+        return null;
     }
 }

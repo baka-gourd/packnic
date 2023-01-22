@@ -1,6 +1,8 @@
 ﻿using CurseForge.APIClient;
 using Packnic.Core.Model;
 
+using System.Xml.Linq;
+
 namespace Packnic.Core;
 
 public static class Utils
@@ -56,6 +58,11 @@ public static class Utils
         }
 
         return true;
+    }
+
+    public static bool ExactHash(this LocalFile file, byte[] hash, HashType type)
+    {
+        return type is HashType.MD5 ? file.Md5.ExactEqual(hash) : file.Sha1.ExactEqual(hash);
     }
 
     public static LocalFileNode? FindById(this List<LocalFileNode> list, Guid id)

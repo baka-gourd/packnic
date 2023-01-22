@@ -51,6 +51,8 @@ namespace Packnic.Tests
                 Sha1 = Array.Empty<byte>()
             });
 
+            var four = tree.Find("test4");
+
             var str = tree.ToString();
             var obj = JsonSerializer.Deserialize<ModTree>(str);
             var str2 = obj!.ToString();
