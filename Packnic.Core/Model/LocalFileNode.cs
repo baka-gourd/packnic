@@ -42,6 +42,7 @@ public record LocalFileNode : LocalFile
 
     public void AddChild(LocalFile file)
     {
+        // good QoL.
         if (Children.FindById(file.Id) is not null)
         {
             return;

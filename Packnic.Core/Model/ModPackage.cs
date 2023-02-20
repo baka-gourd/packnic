@@ -14,4 +14,5 @@ public class ModPackage
     public List<ModPackage> Parents { get; set; } = new();
     public string? Hash { get; set; }
     public HashType HashType { get; set; }
+    public dynamic? ExtendData { get; set; }
 }

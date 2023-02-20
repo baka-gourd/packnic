@@ -1,6 +1,5 @@
 ﻿using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Reflection;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 using Packnic.Core.Model;
@@ -10,21 +9,23 @@ namespace Packnic.Core;
 
 public class InstanceManager
 {
-    public readonly string InstancePath;
+    private readonly string _instancePath;
     private bool Initialized => IsInitialized();
-    private string DataPath => System.IO.Path.Combine(InstancePath, ".packnic");
-    private string ConfigPath => System.IO.Path.Combine(DataPath, "config");
-    private string TreePath => System.IO.Path.Combine(DataPath, "tree");
+    private string DataPath => Path.Combine(_instancePath, ".packnic");
+    private string ConfigPath => Path.Combine(DataPath, "config");
+    private string TreePath => Path.Combine(DataPath, "tree");
+    private string CurseforgeDependencies => Path.Combine(DataPath, "curseforgeDeps");
+    private volatile List<CurseForgeDependenciesNode> _curseForgeDependencies = null!;
     private volatile ModTree _tree = null!;
     private Source _source = Source.None;
-    private CacheManager _manager;
+    private readonly CacheManager _manager;
     public ConcurrentDictionary<string, bool> DownloadState = new();
     public List<string> Names { get; set; } = new();
-    public ConcurrentDictionary<ModPackage, LocalFile> TreeData { get; set; } = new();
+    private ConcurrentDictionary<ModPackage, LocalFile> TreeData { get; set; } = new();
 
     public InstanceManager(string instancePath, CacheManager manager)
     {
-        InstancePath = instancePath;
+        _instancePath = instancePath;
         _manager = manager;
         if (!Initialized)
         {
@@ -32,11 +33,6 @@ public class InstanceManager
         }
 
         ReadData();
-    }
-
-    ~InstanceManager()
-    {
-        SaveTree();
     }
 
     private void Init()
@@ -61,6 +57,11 @@ public class InstanceManager
         {
             _tree = new ModTree();
         }
+
+        if (File.Exists(CurseforgeDependencies))
+        {
+            _curseForgeDependencies = JsonSerializer.Deserialize<List<CurseForgeDependenciesNode>>(File.ReadAllText(CurseforgeDependencies)) ?? new List<CurseForgeDependenciesNode>();
+        }
     }
 
     private bool IsInitialized()
@@ -77,7 +78,7 @@ public class InstanceManager
     {
         // download mod
         SemaphoreSlim sem = new SemaphoreSlim(8);
-        var list = UnfoldModPackages(mod);
+        var list = UnfoldPackageRelation(mod);
         foreach (var modPackage in list)
         {
             Names.Add(modPackage.Name);
@@ -88,7 +89,7 @@ public class InstanceManager
             try
             {
                 await sem.WaitAsync();
-                var path = Path.Combine(InstancePath, Path.GetFileName(pkg.DownloadUrl)!);
+                var path = Path.Combine(_instancePath, Path.GetFileName(pkg.DownloadUrl)!);
 
                 var fileInfo = new FileInfo(path);
 
@@ -125,6 +126,7 @@ public class InstanceManager
                         //File.Copy(file!.Path, path, true);
                     }
 
+                    StoreExtendData(pkg,file);
                     TreeData.TryAdd(pkg, file);
                 }
                 else
@@ -144,6 +146,7 @@ public class InstanceManager
                         File.Copy(stagedFile!.Path, path, true);
                     }
 
+                    StoreExtendData(pkg, stagedFile);
                     TreeData.TryAdd(pkg, stagedFile);
                 }
             }
@@ -158,11 +161,14 @@ public class InstanceManager
             }
         });
 
-        Task.WaitAll(tasks.ToArray());
-        BuildTree();
-        _manager.Dispose();
-        DownloadState.Clear();
-        Names.Clear();
+        new Thread(() =>
+        {
+            Task.WaitAll(tasks.ToArray());
+            BuildTree();
+            _manager.Dispose();
+            DownloadState.Clear();
+            Names.Clear();
+        }).Start();
     }
 
     public void AddMods(IEnumerable<ModPackage> modPackages)
@@ -173,14 +179,14 @@ public class InstanceManager
         }
     }
 
-    private List<ModPackage> UnfoldModPackages(ModPackage mod)
+    private List<ModPackage> UnfoldPackageRelation(ModPackage mod)
     {
         var list = new List<ModPackage> { mod };
         if (mod.Children.Count > 0)
         {
             foreach (var dependency in mod.Children)
             {
-                list.AddRange(UnfoldModPackages(dependency));
+                list.AddRange(UnfoldPackageRelation(dependency));
             }
         }
         return list.DistinctBy(package => package.DownloadUrl).ToList();
@@ -188,50 +194,108 @@ public class InstanceManager
 
     private void BuildTree()
     {
-        var depDict = new List<(string, LocalFile)>();
-        var added = 1;
-        var addedName = new List<string>();
+        var dependenciesList = new List<(string, LocalFile)>();
 
+        // classified mod package.
         foreach (var (modPackage, localFile) in TreeData)
         {
+            // if no parents, add to top.
             if (modPackage.Parents.Count is 0)
             {
                 _tree.Add(localFile);
                 continue;
             }
 
-            foreach (var parent in modPackage.Parents)
-            {
-                depDict.Add((parent.GetFileName(), localFile));
-            }
+            // add all dependencies to list.
+            modPackage.Parents.ForEach(parent=> dependenciesList.Add((parent.GetFileName(), localFile)));
         }
 
-        while (added < depDict.Count)
+        var count = dependenciesList.Count;
+        // add all dependencies to tree.
+        while (count > 0)
         {
-            foreach (var (name, file) in depDict)
+            foreach (var (name, file) in dependenciesList)
             {
-                if (addedName.Contains(name))
-                {
-                    continue;
-                }
                 var node = _tree.FindByName(name);
-                if (node is null)
-                {
-                    continue;
-                }
+                if (node is null) continue;
                 node.AddChild(file);
-                added++;
-                addedName.Add(name);
+                --count;
             }
         }
-
+        
         TreeData.Clear();
-        SaveTree();
+    }
+
+    private void StoreExtendData(ModPackage modPackage, LocalFile file)
+    {
+        if (modPackage.ExtendData is null)
+        {
+            return;
+        }
+
+        if (modPackage.ExtendData.Source is Source.Curseforge)
+        {
+            StoreCurseForgeData(modPackage, file);
+        }
+    }
+
+    private void StoreCurseForgeData(ModPackage modPackage, LocalFile file)
+    {
+        var node = _curseForgeDependencies.FirstOrDefault(n => n.ModId == modPackage.ExtendData!.ModId);
+        if (node is null)
+        {
+            _curseForgeDependencies.Add(new CurseForgeDependenciesNode
+            {
+                ModId = modPackage.ExtendData!.ModId,
+                Dependencies = modPackage.Children.Select(c => (int)c.ExtendData!.ModId).ToList(),
+                Files = new List<CurseForgeFileBind> { new CurseForgeFileBind(modPackage.ExtendData!.FileId, file.Id) }
+            });
+        }
+        else
+        {
+            var index = _curseForgeDependencies.IndexOf(node);
+            var deps = node.Dependencies ?? new List<int>();
+            foreach (var child in modPackage.Children)
+            {
+                if (deps.Contains(child.ExtendData!.ModId))
+                {
+                    continue;
+                }
+
+                deps.Add(child.ExtendData!.ModId);
+            }
+
+            node.Dependencies = deps;
+
+            var files = node.Files ?? new List<CurseForgeFileBind>();
+            var existed = files.FirstOrDefault(f => f.Id.Equals(file.Id)) is not null;
+            if (!existed)
+            {
+                files.Add(new CurseForgeFileBind(modPackage.ExtendData!.FileId, file.Id));
+            }
+
+            node.Files = files;
+            _curseForgeDependencies[index] = node;
+        }
     }
 
     private void SaveTree()
     {
         var str = _tree.ToString();
         File.WriteAllText(TreePath, str);
+    }
+
+    private void SaveCurseForgeData()
+    {
+        var str = JsonSerializer.Serialize(_curseForgeDependencies,
+            new JsonSerializerOptions() {WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping});
+        File.WriteAllText(CurseforgeDependencies,str);
+    }
+
+    public bool SaveData()
+    {
+        SaveTree();
+        SaveCurseForgeData();
+        return true;
     }
 }

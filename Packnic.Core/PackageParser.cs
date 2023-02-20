@@ -3,6 +3,7 @@ using CurseForge.APIClient.Models.Files;
 using CurseForge.APIClient.Models.Mods;
 
 using Packnic.Core.Model;
+using Packnic.Core.Model.Instance;
 
 namespace Packnic.Core;
 
@@ -119,8 +120,10 @@ public static class PackageParser
                     Platform = Platform.CurseForge,
                     Version = Config.GameVersion,
                     Hash = modFile.Data.Hashes.First().Value,
-                    HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1
+                    HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1,
+                    ExtendData = new { Source = Source.Curseforge, modFile.Data.ModId, FileId = modFile.Data.Id }
                 };
+
                 if (modFile.Data.Dependencies is { Count: > 0 })
                 {
                     var mods = new List<int>();

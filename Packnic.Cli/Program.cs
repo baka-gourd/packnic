@@ -71,5 +71,6 @@ class Program
         instanceManager.AddMods(list);
         ProgressBar.DownloadMany(instanceManager.Names, ref instanceManager.DownloadState);
         Console.WriteLine("info: all mods installed.");
+        instanceManager.SaveData();
     }
 }
