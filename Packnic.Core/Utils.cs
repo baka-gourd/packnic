@@ -93,4 +93,14 @@ public static class Utils
     {
         list.Add(new LocalFileNode(file));
     }
+
+    public static int ToInt(this string str)
+    {
+        if (int.TryParse(str, out var num))
+        {
+            return num;
+        }
+
+        return -2;
+    }
 }

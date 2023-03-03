@@ -9,7 +9,6 @@ namespace Packnic.Core;
 
 public class CacheManager : IDisposable
 {
-    private bool _disposed = false;
     private string _path;
     private string _indexFile => Path.Combine(_path, ".index");
     public ConcurrentBag<LocalFile>? LocalFiles { get; set; }
@@ -170,16 +169,5 @@ public class CacheManager : IDisposable
 
     public void Dispose()
     {
-        RefreshIndex();
-        _disposed = true;
-    }
-
-    ~CacheManager()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-        RefreshIndex();
     }
 }

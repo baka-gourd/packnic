@@ -15,7 +15,7 @@ public class InstanceManager
     private string ConfigPath => Path.Combine(DataPath, "config");
     private string TreePath => Path.Combine(DataPath, "tree");
     private string CurseforgeDependencies => Path.Combine(DataPath, "curseforgeDeps");
-    private volatile List<CurseForgeDependenciesNode> _curseForgeDependencies = null!;
+    private List<CurseForgeDependenciesNode>? _curseForgeDependencies;
     private volatile ModTree _tree = null!;
     private Source _source = Source.None;
     private readonly CacheManager _manager;
@@ -112,12 +112,20 @@ public class InstanceManager
                     {
                         if (File.Exists(path) && new FileInfo(path).LinkTarget == file!.Path)
                         {
+                            StoreExtendData(pkg, file);
+                            TreeData.TryAdd(pkg, file);
                             return;
                         }
                         fileInfo.CreateAsSymbolicLink(file!.Path);
                     }
                     else
                     {
+                        if (File.Exists(path))
+                        {
+                            StoreExtendData(pkg, file!);
+                            TreeData.TryAdd(pkg, file!);
+                            return;
+                        }
                         var fs = File.OpenRead(file!.Path);
                         var dst = fileInfo.Create();
                         await fs.CopyToAsync(dst);
@@ -125,7 +133,7 @@ public class InstanceManager
                         fs.Close();
                         //File.Copy(file!.Path, path, true);
                     }
-
+                    
                     StoreExtendData(pkg,file);
                     TreeData.TryAdd(pkg, file);
                 }
@@ -137,12 +145,20 @@ public class InstanceManager
                     {
                         if (File.Exists(path) && new FileInfo(path).LinkTarget == file!.Path)
                         {
+                            StoreExtendData(pkg, stagedFile!);
+                            TreeData.TryAdd(pkg, stagedFile!);
                             return;
                         }
                         File.CreateSymbolicLink(path, stagedFile!.Path);
                     }
                     else
                     {
+                        if (File.Exists(path))
+                        {
+                            StoreExtendData(pkg, stagedFile!);
+                            TreeData.TryAdd(pkg, stagedFile!);
+                            return;
+                        }
                         File.Copy(stagedFile!.Path, path, true);
                     }
 
@@ -228,12 +244,18 @@ public class InstanceManager
 
     private void StoreExtendData(ModPackage modPackage, LocalFile file)
     {
-        if (modPackage.ExtendData is null)
+        string? source;
+        if (!modPackage.ExtendData.TryGetValue("source", out source))
         {
             return;
         }
 
-        if (modPackage.ExtendData.Source is Source.Curseforge)
+        if (source is "modrinth")
+        {
+            return;
+        }
+
+        if (source is "curseforge")
         {
             StoreCurseForgeData(modPackage, file);
         }
@@ -241,28 +263,32 @@ public class InstanceManager
 
     private void StoreCurseForgeData(ModPackage modPackage, LocalFile file)
     {
-        var node = _curseForgeDependencies.FirstOrDefault(n => n.ModId == modPackage.ExtendData!.ModId);
-        if (node is null)
+        _curseForgeDependencies = _curseForgeDependencies ?? new List<CurseForgeDependenciesNode>();
+        lock (_curseForgeDependencies)
         {
-            _curseForgeDependencies.Add(new CurseForgeDependenciesNode
+            var node = _curseForgeDependencies.FirstOrDefault(n => n.ModId == modPackage.ExtendData["modId"].ToInt());
+            if (node is null)
             {
-                ModId = modPackage.ExtendData!.ModId,
-                Dependencies = modPackage.Children.Select(c => (int)c.ExtendData!.ModId).ToList(),
-                Files = new List<CurseForgeFileBind> { new CurseForgeFileBind(modPackage.ExtendData!.FileId, file.Id) }
-            });
-        }
-        else
-        {
+                _curseForgeDependencies.Add(new CurseForgeDependenciesNode
+                {
+                    ModId = modPackage.ExtendData["modId"].ToInt(),
+                    Dependencies = modPackage.Children.Select(c => modPackage.ExtendData["modId"].ToInt()).Distinct().ToList(),
+                    Files = new List<CurseForgeFileBind> { new(modPackage.ExtendData["fileId"].ToInt(), file.Id) }
+                });
+
+                return;
+            }
+
             var index = _curseForgeDependencies.IndexOf(node);
             var deps = node.Dependencies ?? new List<int>();
             foreach (var child in modPackage.Children)
             {
-                if (deps.Contains(child.ExtendData!.ModId))
+                if (deps.Contains(child.ExtendData["modId"].ToInt()))
                 {
                     continue;
                 }
 
-                deps.Add(child.ExtendData!.ModId);
+                deps.Add(child.ExtendData["modId"].ToInt());
             }
 
             node.Dependencies = deps;
@@ -271,7 +297,7 @@ public class InstanceManager
             var existed = files.FirstOrDefault(f => f.Id.Equals(file.Id)) is not null;
             if (!existed)
             {
-                files.Add(new CurseForgeFileBind(modPackage.ExtendData!.FileId, file.Id));
+                files.Add(new CurseForgeFileBind(modPackage.ExtendData["fileId"].ToInt(), file.Id));
             }
 
             node.Files = files;
@@ -287,6 +313,21 @@ public class InstanceManager
 
     private void SaveCurseForgeData()
     {
+        _curseForgeDependencies ??= new();
+        var res = _curseForgeDependencies.DistinctBy(d=>d.ModId).ToList();
+        for (int i = 0; i < res.Count; i++)
+        {
+            var node = res[i];
+            var d1 = node.Dependencies!.Distinct().ToList();
+            if (d1.Contains(node.ModId))
+            {
+                d1.Remove(node.ModId);
+            }
+            var d2 = node.Files!.DistinctBy(f => f.FileId).ToList();
+            node.Dependencies = d1;
+            node.Files = d2;
+            res[i] = node;
+        }
         var str = JsonSerializer.Serialize(_curseForgeDependencies,
             new JsonSerializerOptions() {WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping});
         File.WriteAllText(CurseforgeDependencies,str);

@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Collections.Immutable;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Packnic.Core.Model;
 
@@ -14,5 +15,5 @@ public class ModPackage
     public List<ModPackage> Parents { get; set; } = new();
     public string? Hash { get; set; }
     public HashType HashType { get; set; }
-    public dynamic? ExtendData { get; set; }
+    public Dictionary<string, string> ExtendData { get; set; } = new();
 }

@@ -121,7 +121,7 @@ public static class PackageParser
                     Version = Config.GameVersion,
                     Hash = modFile.Data.Hashes.First().Value,
                     HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1,
-                    ExtendData = new { Source = Source.Curseforge, modFile.Data.ModId, FileId = modFile.Data.Id }
+                    ExtendData = { { "source", "curseforge" }, { "modId", modFile.Data.ModId.ToString() }, { "fileId", modFile.Data.Id.ToString() } }
                 };
 
                 if (modFile.Data.Dependencies is { Count: > 0 })
@@ -176,7 +176,8 @@ public static class PackageParser
                         Platform = Platform.CurseForge,
                         Version = Config.GameVersion,
                         Hash = modFile.Data.Hashes.First().Value,
-                        HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1
+                        HashType = modFile.Data.Hashes.First().Algo is HashAlgo.Md5 ? HashType.MD5 : HashType.SHA1,
+                        ExtendData = { { "source", "curseforge" }, { "modId", modFile.Data.ModId.ToString() }, { "fileId", modFile.Data.Id.ToString() } }
                     };
 
                     if (modFile.Data.Dependencies is { Count: > 0 })
